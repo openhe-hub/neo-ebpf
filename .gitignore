@@ -1,0 +1,21 @@
+# Build artifacts
+/target
+**/target
+
+# eBPF outputs
+/bpf/vmlinux.h
+/bpf/*.bpf.o
+
+# Loader binary
+# /loader/sched_loader
+
+# Test helper binary
+# /tests/cpu_bound
+
+# Generated assets
+# /assets/*.csv
+
+# Misc
+*.swp
+*.log
+.DS_Store
