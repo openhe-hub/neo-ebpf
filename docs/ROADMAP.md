@@ -6,9 +6,9 @@
 - Provide helper workloads for easy validation.
 
 ## Milestone 2 — User-space lottery simulation
-- Extend the Rust runner to run a lottery draw using the recorded ticket counts.
-- Produce rankings or scheduling order suggestions based on collected stats.
-- Emit richer telemetry (per-cgroup summaries, rolling averages).
+- ✅ Extend the Rust runner to run lottery draws using the recorded ticket counts (see `--simulate-draws`, `--seed`, `--top`).
+- ✅ Produce live rankings/scheduling order hints based on ticket share and rolling runtime deltas.
+- ⏳ Emit richer telemetry such as per-cgroup summaries (rolling stats + CSV enrichments are in place; per-cgroup metadata pending kernel-support work).
 
 ## Milestone 3 — Advanced scheduling research
 - Experiment with EDF or hybrid schedulers by deriving deadlines/periods from stats.

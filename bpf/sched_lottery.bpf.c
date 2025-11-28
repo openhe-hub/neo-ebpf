@@ -27,7 +27,10 @@ static __always_inline __u32 nice_to_tickets(__s32 nice)
 
     __u32 base = 100;
     __u32 alpha = 10;
-    return base + alpha * (-nice);
+    __s32 scaled = base + alpha * (-nice);
+    if (scaled < 10)
+        return 10;
+    return scaled;
 }
 
 static __always_inline struct task_info *get_task_info(__u32 pid)
