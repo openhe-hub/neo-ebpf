@@ -141,6 +141,21 @@ dump_stats() {
     fi
 }
 
+run_tui() {
+    build_rust
+    local bin="$RUST_DIR/target/release/rust-runner"
+    if [ ! -x "$bin" ]; then
+        echo "Runner binary missing: $bin" >&2
+        exit 1
+    fi
+    echo "[+] Launching TUI (press 'q' to exit)"
+    if [ "${EUID}" -ne 0 ]; then
+        run_as_root "$bin" tui --map "$MAP_PIN" "$@"
+    else
+        "$bin" tui --map "$MAP_PIN" "$@"
+    fi
+}
+
 run_workload() {
     build_workload
     echo "[+] Launching workload: $TEST_BIN $*"
@@ -156,6 +171,7 @@ Commands:
   load              Load + attach the BPF program (requires root/sudo)
   unload            Detach and remove pinned program/map
   dump [args]       Run the Rust CLI (extra args passed through to 'dump')
+  tui  [args]       Launch the interactive terminal dashboard (press 'q' to exit)
   workload [args]   Run the CPU workload helper (defaults see tests/cpu_bound.c)
   help              Show this help
 
@@ -183,6 +199,9 @@ case "$CMD" in
         ;;
     dump)
         dump_stats "$@"
+        ;;
+    tui)
+        run_tui "$@"
         ;;
     workload)
         run_workload "$@"

@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use rand::Rng;
+use serde::Serialize;
 
 #[repr(C)]
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize)]
 pub struct TaskInfo {
     pub runtime_ns: u64,
     pub switches: u64,
@@ -18,12 +19,17 @@ impl TaskInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TaskSnapshot {
     pub pid: u32,
     pub info: TaskInfo,
     pub runtime_delta_ns: u64,
     pub rolling_runtime_ms: f64,
+    pub switch_delta: u64,
+    pub estimated_period_ms: f64,
+    pub deadline_ms: f64,
+    pub lateness_ms: f64,
+    pub utilization: f64,
     pub ticket_share: f64,
 }
 
@@ -31,12 +37,17 @@ impl TaskSnapshot {
     pub fn runtime_delta_ms(&self) -> f64 {
         self.runtime_delta_ns as f64 / 1_000_000.0
     }
+
+    pub fn deadline_missed(&self) -> bool {
+        self.lateness_ms > 0.0
+    }
 }
 
 #[derive(Debug)]
 pub struct RollingStats {
     alpha: f64,
     prev_runtime_ns: HashMap<u32, u64>,
+    prev_switches: HashMap<u32, u64>,
     rolling_runtime_ms: HashMap<u32, f64>,
 }
 
@@ -45,20 +56,27 @@ impl RollingStats {
         Self {
             alpha: alpha.clamp(0.0, 1.0),
             prev_runtime_ns: HashMap::new(),
+            prev_switches: HashMap::new(),
             rolling_runtime_ms: HashMap::new(),
         }
     }
 
-    pub fn update(&mut self, pid: u32, runtime_ns: u64) -> (u64, f64) {
-        let prev = self.prev_runtime_ns.insert(pid, runtime_ns);
-        let delta_ns = prev
+    pub fn update(&mut self, pid: u32, runtime_ns: u64, switches: u64) -> (u64, f64, u64) {
+        let prev_runtime = self.prev_runtime_ns.insert(pid, runtime_ns);
+        let delta_ns = prev_runtime
             .map(|p| runtime_ns.saturating_sub(p))
             .unwrap_or_default();
+
+        let prev_switch = self.prev_switches.insert(pid, switches);
+        let switch_delta = prev_switch
+            .map(|p| switches.saturating_sub(p))
+            .unwrap_or_default();
+
         let delta_ms = delta_ns as f64 / 1_000_000.0;
         let current = self.rolling_runtime_ms.entry(pid).or_insert(delta_ms);
         let next = self.alpha * delta_ms + (1.0 - self.alpha) * *current;
         *current = next;
-        (delta_ns, next)
+        (delta_ns, next, switch_delta)
     }
 }
 

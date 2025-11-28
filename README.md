@@ -38,6 +38,9 @@ sudo ./scripts/run.sh load
 # Dump stats every second, 5 samples, writing into assets/stats.csv
 ./scripts/run.sh dump --interval 1 --iterations 5 --output assets/stats.csv \
     --simulate-draws 20 --top 3
+
+# Interactive terminal dashboard (press 'q' to exit)
+./scripts/run.sh tui --refresh-ms 500 --top 12
 ```
 
 The script also exposes overrides such as `MAP_PIN`, `PROG_PIN`, `LINK_PIN`, and `BTF_PATH`. Run `./scripts/run.sh help` for the complete list.
@@ -48,6 +51,7 @@ The script also exposes overrides such as `MAP_PIN`, `PROG_PIN`, `LINK_PIN`, and
 - `load`: cleans previous pins, opens `bpf/sched_lottery.bpf.o` via the loader, attaches to `sched:sched_switch`, pins program/map/link under `/sys/fs/bpf/`, and relaxes permissions (directory `0755`, map `0644`) so the CLI can read it.
 - `dump`: ensures the CLI binary exists, then re-executes it via sudo to obtain the required `bpf_obj_get` privileges while keeping user-provided arguments (interval/iterations/output, lottery simulation flags). Output tables include rolling metrics; CSV rows are appended to the chosen file (defaults friendly to `assets/stats.csv`).
 - `workload`: builds (if needed) and runs `tests/cpu_bound` with the given nice/duration to create repeatable scheduler pressure.
+- `tui`: launches the interactive dashboard (reuses the pinned map, same flags as the CLI `tui` subcommand).
 - `unload`: removes pinned link/program/map to fully stop the tracer.
 
 ## Developing individual components
@@ -74,6 +78,20 @@ The CLI (`dump` command) now includes scheduler-analysis helpers:
 - `--top M`: show the top M candidates sorted by ticket share (default 5).
 - `--alpha X`: configure the exponential moving average used for rolling runtime deltas (default 0.5).
 - `--seed S`: optional RNG seed for reproducible lottery draws.
+- `--json-output PATH`: append per-task NDJSON rows (easy to feed into jq, Grafana Loki, etc.).
+- `--trace-output PATH`: emit Chrome trace / Perfetto-compatible events for time-line visualisations.
+- `--deadline-warn MS`: print alerts whenever the heuristic EDF lateness exceeds MS milliseconds.
+
+Example:
+
+```bash
+./scripts/run.sh dump --interval 1 --iterations 20 \
+    --simulate-draws 50 --top 5 \
+    --json-output assets/sched.ndjson \
+    --trace-output assets/sched_trace.json \
+    --deadline-warn 2 \
+    --output assets/stats_m3.csv
+```
 
 The per-iteration table prints:
 
@@ -82,18 +100,34 @@ The per-iteration table prints:
 | `RUNTIME_MS` | Lifetime runtime observed by the eBPF program |
 | `DELTA_MS` | Runtime delta since the previous sample |
 | `ROLL_MS` | Exponential moving average of the delta |
+| `PERIOD_MS` | Heuristic period derived from switch frequency within the sampling window |
+| `LATENESS` | Estimated deadline miss (`delta_ms - period_ms`) |
+| `UTIL%` | Estimated utilisation (`delta_ms / period_ms`) |
 | `TICKETS` / `SHARE%` | Lottery tickets assigned from nice value + relative probability |
+| `SW_DELTA` | Number of context switches observed in the last iteration |
 
-CSV output includes `iteration,timestamp,pid,runtime_ns,runtime_ms,delta_ns,delta_ms,rolling_runtime_ms,switches,nice,tickets,ticket_share`.
+CSV output now includes `estimated_period_ms`, `lateness_ms`, and `utilization` columns. NDJSON rows mirror the same fields, and the Chrome trace (if enabled) encodes each task's runtime delta as a `ph:"X"` slice with ticket/EDF metadata in `args`.
 
 ## Data workflow
 
 1. Run one or more workloads with different nice values.
 2. Keep the tracer loaded with `./scripts/run.sh load`.
 3. Capture samples via `./scripts/run.sh dump --interval N --iterations M --simulate-draws 50 --output assets/stats.csv`.
-4. Inspect `assets/stats.csv` (or any path you passed) with your favorite plotting/analysis tool.
+4. Inspect `assets/stats.csv` / NDJSON / `trace_output` with your favorite plotting/analysis tool (CSV → pandas, NDJSON → jq, trace JSON → https://ui.perfetto.dev).
 
 Use the printed lottery ranking and simulated winners to reason about (or compare against) your user-space scheduler experiments.
+
+## Terminal dashboard (tui)
+
+Prefer a quick at-a-glance view without external tools? `./scripts/run.sh tui` launches a `ratatui`-powered dashboard inside your terminal:
+
+- Shows the top-N runnable tasks, ticket share, runtime deltas, estimated period, lateness, and utilisation.
+- Highlights overdue tasks in red (same EDF heuristic as the batch dump).
+- Left-hand side shows the sortable task table plus a summary panel with total tickets, avg/worst lateness, utilisation, overdue count, runtime window, and the hottest lottery candidate.
+- Right-hand side stacks sparklines for avg/worst lateness, avg utilisation, overdue task count, and runtime window so you can spot trends even when absolute numbers look calm.
+- Interactive keys: press `q` or `Esc` to quit. Arguments: `--refresh-ms` (default 1000), `--top N`, `--alpha` (rolling EWMA), `--map PATH`.
+
+Because the TUI reuses the same pinned map, it still needs access to `/sys/fs/bpf/task_map`; the helper script automatically re-execs via sudo just like the batch `dump` command.
 
 ## Troubleshooting
 

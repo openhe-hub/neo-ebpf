@@ -7,13 +7,15 @@
 /bpf/*.bpf.o
 
 # Loader binary
-# /loader/sched_loader
+/loader/sched_loader
 
 # Test helper binary
-# /tests/cpu_bound
+/tests/cpu_bound
 
 # Generated assets
-# /assets/*.csv
+/assets/*.csv
+/assets/*.json
+/assets/*.ndjson
 
 # Misc
 *.swp

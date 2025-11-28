@@ -11,6 +11,7 @@
 - ⏳ Emit richer telemetry such as per-cgroup summaries (rolling stats + CSV enrichments are in place; per-cgroup metadata pending kernel-support work).
 
 ## Milestone 3 — Advanced scheduling research
-- Experiment with EDF or hybrid schedulers by deriving deadlines/periods from stats.
-- Feed metrics into visualization dashboards or tracing pipelines (e.g., perfetto).
-- Introduce alerting/reporting hooks for long-term regression tracking.
+- ✅ Experiment with EDF or hybrid schedulers by deriving deadlines/periods from stats (CLI now reports heuristic periods, lateness, utilisation).
+- ✅ Feed metrics into visualization dashboards or tracing pipelines (NDJSON + Chrome trace exports land under `--json-output/--trace-output`).
+- ✅ Introduce alerting/reporting hooks (deadline warnings + EDF summary in CLI).
+- ⏳ Next ideas: plug the NDJSON stream into Grafana/Loki or perfetto.dev automation, explore EDF vs. lottery hybrid policies, and add long-running regression tests.
