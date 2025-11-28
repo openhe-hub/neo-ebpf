@@ -1,5 +1,7 @@
 # eBPF Lottery Scheduler Monitor
 
+![TUI Demo](assets/demo.png)
+
 This repo contains a tiny end-to-end stack for observing Linux scheduling events and deriving toy "lottery scheduler" metrics. The kernel side attaches to `sched:sched_switch` and stores per-PID stats (runtime, switches, nice-derived tickets). The user-space side periodically reads the pinned map, prints tables, runs lottery simulations, and appends rows to CSV for later analysis.
 
 ## Repository layout
